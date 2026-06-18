@@ -7,10 +7,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN apk update \
     && apk upgrade \
+    && apk add --no-cache gcc musl-dev linux-headers \
     && rm -rf /var/cache/apk/*
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
+
+RUN apk del gcc musl-dev linux-headers
 RUN addgroup -S app && adduser -S app -G app
 
 COPY app ./app
