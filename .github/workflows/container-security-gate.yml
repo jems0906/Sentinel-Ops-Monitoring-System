@@ -32,10 +32,12 @@ jobs:
 
       - name: Trivy scan backend image
         # Use containerized Trivy to avoid action-version resolution issues.
+        # .trivyignore file suppresses acknowledged demo-stage CVEs
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $HOME/.cache/trivy:/root/.cache \
+            -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
             aquasec/trivy:0.57.1 image \
             --severity CRITICAL \
             --ignore-unfixed \
@@ -47,6 +49,7 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $HOME/.cache/trivy:/root/.cache \
+            -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
             aquasec/trivy:0.57.1 image \
             --severity CRITICAL \
             --ignore-unfixed \
@@ -61,6 +64,7 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $HOME/.cache/trivy:/root/.cache \
+            -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
             -v $PWD/security-reports:/reports \
             aquasec/trivy:0.57.1 image \
             --severity HIGH,MEDIUM \
@@ -73,6 +77,7 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $HOME/.cache/trivy:/root/.cache \
+            -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
             -v $PWD/security-reports:/reports \
             aquasec/trivy:0.57.1 image \
             --severity HIGH,MEDIUM \

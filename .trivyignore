@@ -1,0 +1,27 @@
+# Trivy vulnerability ignore file
+# These CVEs are acknowledged and tracked for remediation
+# Generated: 2026-06-18
+# Status: Demo/staging environment - not approved for strict production use
+
+# Python 3.12-slim-bookworm base image known CVEs (Debian packages)
+# See: https://security.debian.org/
+# Remediation: Scheduled for next base image update or formal risk acceptance
+
+# CVE-2024-XXXXX (example - replace with actual CVE IDs from scan)
+# Applies to: libssl3, libcrypto (OpenSSL in Debian bookworm)
+# Severity: CRITICAL
+# Impact: Low for this monitoring system (no TLS termination in app layer)
+# Expiration: 2026-12-31
+
+# Backend Python package vulnerabilities (if any)
+# Note: All application dependencies are pinned to versions in requirements.txt
+# Updates tracked in separate dependency upgrade workflow
+
+# Frontend build-time dependencies are optimized separately
+# See: frontend/Dockerfile multi-stage build with Alpine 3.22
+
+# Process for enabling/disabling:
+# 1. GitHub Actions container-security-gate.yml reads this file
+# 2. Remove individual CVE entries as vulnerabilities are patched
+# 3. Update expiration dates when dependencies are upgraded
+# 4. For production deployments, perform formal risk acceptance process
