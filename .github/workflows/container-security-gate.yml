@@ -27,8 +27,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Pre-pull base images
+        run: |
+          docker pull public.ecr.aws/docker/library/python:3.12-alpine3.22
+          docker pull public.ecr.aws/docker/library/node:22-alpine3.22
+          docker pull public.ecr.aws/docker/library/nginx:1.29-alpine
+
       - name: Build backend and frontend images
-        run: docker compose build backend frontend
+        run: |
+          n=0
+          until [ "$n" -ge 3 ]
+          do
+            docker compose build backend frontend && break
+            n=$((n+1))
+            echo "Build attempt $n failed; retrying..."
+          done
+          [ "$n" -lt 3 ]
 
       - name: Trivy scan backend image
         # Use containerized Trivy to avoid action-version resolution issues.
@@ -38,7 +52,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $HOME/.cache/trivy:/root/.cache \
             -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
-            aquasec/trivy:0.57.1 image \
+            public.ecr.aws/aquasecurity/trivy:0.57.1 image \
             --severity CRITICAL \
             --ignore-unfixed \
             --exit-code 1 \
@@ -50,7 +64,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $HOME/.cache/trivy:/root/.cache \
             -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
-            aquasec/trivy:0.57.1 image \
+            public.ecr.aws/aquasecurity/trivy:0.57.1 image \
             --severity CRITICAL \
             --ignore-unfixed \
             --exit-code 1 \
@@ -66,7 +80,7 @@ jobs:
             -v $HOME/.cache/trivy:/root/.cache \
             -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
             -v $PWD/security-reports:/reports \
-            aquasec/trivy:0.57.1 image \
+            public.ecr.aws/aquasecurity/trivy:0.57.1 image \
             --severity HIGH,MEDIUM \
             --ignore-unfixed \
             --exit-code 0 \
@@ -79,7 +93,7 @@ jobs:
             -v $HOME/.cache/trivy:/root/.cache \
             -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
             -v $PWD/security-reports:/reports \
-            aquasec/trivy:0.57.1 image \
+            public.ecr.aws/aquasecurity/trivy:0.57.1 image \
             --severity HIGH,MEDIUM \
             --ignore-unfixed \
             --exit-code 0 \
