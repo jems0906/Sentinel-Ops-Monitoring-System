@@ -22,6 +22,7 @@ on:
 jobs:
   scan-images:
     runs-on: ubuntu-latest
+    # CI refresh marker: keep this workflow in sync with latest Dockerfile fixes.
 
     steps:
       - name: Checkout
