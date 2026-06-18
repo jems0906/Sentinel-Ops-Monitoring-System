@@ -1,0 +1,20 @@
+# Python caches and test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Runtime SQLite data
+backend/data/*.db
+
+# Drill/runtime generated reports
+ops/drill_report.json
+ops/readiness_report.json
+
+# Node artifacts
+frontend/node_modules/
+frontend/dist/
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
+.vscode/

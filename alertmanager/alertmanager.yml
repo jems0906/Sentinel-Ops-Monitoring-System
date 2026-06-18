@@ -1,0 +1,15 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: backend-webhook
+  group_by: ["alertname", "severity"]
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 2m
+
+receivers:
+  - name: backend-webhook
+    webhook_configs:
+      - url: http://backend:8000/api/external-alerts/prometheus
+        send_resolved: true

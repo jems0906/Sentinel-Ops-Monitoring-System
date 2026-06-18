@@ -1,0 +1,62 @@
+groups:
+  - name: sentinel_ops_alerts
+    rules:
+      - alert: SentinelTargetDown
+        expr: sentinel_target_status == 0
+        for: 30s
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "Target down: {{ $labels.target }}"
+          description: "Target {{ $labels.target }} is down for more than 30 seconds."
+
+      - alert: SentinelTargetDegradedHighLatency
+        expr: sentinel_target_status == 0.5
+        for: 60s
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "Target degraded: {{ $labels.target }}"
+          description: "Target {{ $labels.target }} remains degraded for over 60 seconds."
+
+      - alert: SentinelOpenIncidentBacklog
+        expr: sum(sentinel_open_incidents) > 0
+        for: 60s
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "Open incidents present"
+          description: "There are open incidents in Sentinel Ops for over 60 seconds."
+
+      - alert: SentinelExternalAlertBacklog
+        expr: sentinel_external_alerts_unacknowledged > 10
+        for: 2m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "External alert backlog growing"
+          description: "{{ $value }} external alerts have been unacknowledged for over 2 minutes."
+
+      - alert: SentinelExternalAlertBacklogCritical
+        expr: sentinel_external_alerts_unacknowledged > 50
+        for: 2m
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "External alert backlog critical"
+          description: "{{ $value }} external alerts unacknowledged — operator triage required."
+
+      - alert: SentinelExternalAlertSpiking
+        expr: sum(increase(sentinel_external_alerts_total[5m])) > 20
+        for: 1m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "External alert ingestion spike"
+          description: "More than 20 external alerts ingested in the last 5 minutes."

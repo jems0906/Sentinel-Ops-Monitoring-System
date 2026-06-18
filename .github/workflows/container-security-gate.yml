@@ -1,0 +1,90 @@
+name: container-security-gate
+
+on:
+  push:
+    paths:
+      - backend/**
+      - frontend/**
+      - docker-compose.yml
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - .github/workflows/container-security-gate.yml
+  pull_request:
+    paths:
+      - backend/**
+      - frontend/**
+      - docker-compose.yml
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - .github/workflows/container-security-gate.yml
+  workflow_dispatch:
+
+jobs:
+  scan-images:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build backend and frontend images
+        run: docker compose build backend frontend
+
+      - name: Trivy scan backend image
+        # Use containerized Trivy to avoid action-version resolution issues.
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v $HOME/.cache/trivy:/root/.cache \
+            aquasec/trivy:0.57.1 image \
+            --severity CRITICAL \
+            --ignore-unfixed \
+            --exit-code 1 \
+            sentinelopsmonitoringsystem-backend:latest
+
+      - name: Trivy scan frontend image
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v $HOME/.cache/trivy:/root/.cache \
+            aquasec/trivy:0.57.1 image \
+            --severity CRITICAL \
+            --ignore-unfixed \
+            --exit-code 1 \
+            sentinelopsmonitoringsystem-frontend:latest
+
+      - name: Generate high/medium scan reports (non-blocking)
+        if: ${{ always() }}
+        run: |
+          mkdir -p security-reports
+
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v $HOME/.cache/trivy:/root/.cache \
+            -v $PWD/security-reports:/reports \
+            aquasec/trivy:0.57.1 image \
+            --severity HIGH,MEDIUM \
+            --ignore-unfixed \
+            --exit-code 0 \
+            --format json \
+            --output /reports/backend-trivy-high-medium.json \
+            sentinelopsmonitoringsystem-backend:latest
+
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v $HOME/.cache/trivy:/root/.cache \
+            -v $PWD/security-reports:/reports \
+            aquasec/trivy:0.57.1 image \
+            --severity HIGH,MEDIUM \
+            --ignore-unfixed \
+            --exit-code 0 \
+            --format json \
+            --output /reports/frontend-trivy-high-medium.json \
+            sentinelopsmonitoringsystem-frontend:latest
+
+      - name: Upload security reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-security-reports
+          path: security-reports/*.json

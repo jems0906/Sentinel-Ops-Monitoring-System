@@ -1,0 +1,59 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: sentinel-backend
+    ports:
+      - "8001:8000"
+    environment:
+      SENTINEL_DATABASE_URL: sqlite:///./data/sentinel_ops.db
+      SENTINEL_MONITOR_INTERVAL_SECONDS: 5
+      SENTINEL_INCIDENT_COOLDOWN_SECONDS: 30
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/config:/app/config
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE: http://localhost:8001
+    container_name: sentinel-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+  prometheus:
+    build:
+      context: ./prometheus
+    container_name: sentinel-prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+      - alertmanager
+
+  alertmanager:
+    build:
+      context: ./alertmanager
+    container_name: sentinel-alertmanager
+    ports:
+      - "9093:9093"
+
+  grafana:
+    build:
+      context: ./grafana
+    container_name: sentinel-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    depends_on:
+      - prometheus

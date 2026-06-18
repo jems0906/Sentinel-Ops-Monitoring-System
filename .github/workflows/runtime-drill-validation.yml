@@ -1,0 +1,78 @@
+name: runtime-drill-validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - backend/**
+      - frontend/**
+      - ops/**
+      - docker-compose.yml
+      - prometheus/**
+      - grafana/**
+      - .github/workflows/runtime-drill-validation.yml
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Docker Compose
+        run: docker compose version
+
+      - name: Start stack
+        run: docker compose up --build -d
+
+      - name: Wait for backend
+        shell: pwsh
+        run: |
+          $ok = $false
+          foreach ($i in 1..60) {
+            try {
+              $r = Invoke-RestMethod http://localhost:8001/health
+              if ($r.status -eq 'ok') {
+                $ok = $true
+                break
+              }
+            }
+            catch {
+            }
+          }
+          if (-not $ok) {
+            throw "Backend did not become healthy in expected retries."
+          }
+
+      - name: Run full drill suite
+        shell: pwsh
+        run: ./ops/run_all_drills.ps1
+
+      - name: Validate scenario results
+        shell: pwsh
+        run: |
+          $report = Get-Content ./ops/drill_report.json -Raw | ConvertFrom-Json
+          $required = @('server_down', 'high_latency', 'dns_failure', 'service_crash_restart')
+          foreach ($name in $required) {
+            if ($null -eq $report.scenario_results.$name) {
+              throw "Missing scenario result: $name"
+            }
+            if (-not $report.scenario_results.$name.passed) {
+              throw "Scenario failed: $name"
+            }
+          }
+
+      - name: Upload drill report
+        uses: actions/upload-artifact@v4
+        with:
+          name: drill-report
+          path: ops/drill_report.json
+
+      - name: Compose logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Teardown
+        if: always()
+        run: docker compose down
