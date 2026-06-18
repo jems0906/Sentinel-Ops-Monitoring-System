@@ -1,17 +1,17 @@
-FROM python:3.12-slim-bookworm
+FROM python:3.12-alpine3.22
 
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-RUN apt-get update \
-    && apt-get upgrade -y \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk update \
+    && apk upgrade \
+    && rm -rf /var/cache/apk/*
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-RUN addgroup --system app && adduser --system --ingroup app app
+RUN addgroup -S app && adduser -S app -G app
 
 COPY app ./app
 COPY config ./config
