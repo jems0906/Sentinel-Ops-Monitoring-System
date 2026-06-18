@@ -18,7 +18,7 @@ RUN addgroup -S app && adduser -S app -G app
 
 COPY app ./app
 COPY config ./config
-COPY data ./data
+RUN mkdir -p /app/data
 RUN chown -R app:app /app
 
 USER app
