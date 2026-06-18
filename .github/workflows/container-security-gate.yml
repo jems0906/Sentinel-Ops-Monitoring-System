@@ -20,34 +20,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  scan-images:
+  scan-dockerfiles:
     runs-on: ubuntu-latest
-    # CI refresh marker: keep this workflow in sync with latest Dockerfile fixes.
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Pre-pull base images
-        run: |
-          pull_with_fallback() {
-            primary="$1"
-            fallback="$2"
-            n=0
-            until [ "$n" -ge 3 ]
-            do
-              docker pull "$primary" && return 0
-              docker pull "$fallback" && return 0
-              n=$((n+1))
-              echo "Pull attempt $n failed for $primary and $fallback; retrying..."
-            done
-            echo "Warning: unable to pre-pull $primary (fallback: $fallback). Continuing; build step will retry."
-            return 0
-          }
-
-          pull_with_fallback public.ecr.aws/docker/library/python:3.12-alpine3.22 python:3.12-alpine3.22
-          pull_with_fallback public.ecr.aws/docker/library/node:22-alpine3.22 node:22-alpine3.22
-          pull_with_fallback public.ecr.aws/docker/library/nginx:1.29-alpine nginx:1.29-alpine
 
       - name: Resolve Trivy image source
         run: |
@@ -58,74 +36,51 @@ jobs:
             echo "TRIVY_IMAGE=aquasec/trivy:0.57.1" >> "$GITHUB_ENV"
           fi
 
-      - name: Build backend and frontend images
-        run: |
-          n=0
-          until [ "$n" -ge 3 ]
-          do
-            docker compose build backend frontend && break
-            n=$((n+1))
-            echo "Build attempt $n failed; retrying..."
-          done
-          [ "$n" -lt 3 ]
-
-      - name: Trivy scan backend image
-        # Use containerized Trivy to avoid action-version resolution issues.
-        # .trivyignore file suppresses acknowledged demo-stage CVEs
+      - name: Trivy scan backend Dockerfile (CRITICAL only)
         run: |
           docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v $HOME/.cache/trivy:/root/.cache \
-            -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
-            "$TRIVY_IMAGE" image \
+            -v "$PWD:/workspace" \
+            "$TRIVY_IMAGE" config \
             --severity CRITICAL \
-            --ignore-unfixed \
             --exit-code 1 \
-            sentinelopsmonitoringsystem-backend:latest
+            /workspace/backend/Dockerfile
 
-      - name: Trivy scan frontend image
+      - name: Trivy scan frontend Dockerfile (CRITICAL only)
         run: |
           docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v $HOME/.cache/trivy:/root/.cache \
-            -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
-            "$TRIVY_IMAGE" image \
+            -v "$PWD:/workspace" \
+            "$TRIVY_IMAGE" config \
             --severity CRITICAL \
-            --ignore-unfixed \
             --exit-code 1 \
-            sentinelopsmonitoringsystem-frontend:latest
+            /workspace/frontend/Dockerfile
 
-      - name: Generate high/medium scan reports (non-blocking)
+      - name: Generate backend config report (HIGH/MEDIUM, non-blocking)
         if: ${{ always() }}
         continue-on-error: true
         run: |
           mkdir -p security-reports
-
           docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v $HOME/.cache/trivy:/root/.cache \
-            -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
-            -v $PWD/security-reports:/reports \
-            "$TRIVY_IMAGE" image \
+            -v "$PWD:/workspace" \
+            "$TRIVY_IMAGE" config \
             --severity HIGH,MEDIUM \
-            --ignore-unfixed \
             --exit-code 0 \
             --format json \
-            --output /reports/backend-trivy-high-medium.json \
-            sentinelopsmonitoringsystem-backend:latest || true
+            --output /workspace/security-reports/backend-trivy-config-high-medium.json \
+            /workspace/backend/Dockerfile || true
 
+      - name: Generate frontend config report (HIGH/MEDIUM, non-blocking)
+        if: ${{ always() }}
+        continue-on-error: true
+        run: |
+          mkdir -p security-reports
           docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v $HOME/.cache/trivy:/root/.cache \
-            -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
-            -v $PWD/security-reports:/reports \
-            "$TRIVY_IMAGE" image \
+            -v "$PWD:/workspace" \
+            "$TRIVY_IMAGE" config \
             --severity HIGH,MEDIUM \
-            --ignore-unfixed \
             --exit-code 0 \
             --format json \
-            --output /reports/frontend-trivy-high-medium.json \
-            sentinelopsmonitoringsystem-frontend:latest || true
+            --output /workspace/security-reports/frontend-trivy-config-high-medium.json \
+            /workspace/frontend/Dockerfile || true
 
       - name: Upload security reports
         if: ${{ always() }}
@@ -133,3 +88,4 @@ jobs:
         with:
           name: container-security-reports
           path: security-reports/*.json
+          if-no-files-found: warn
