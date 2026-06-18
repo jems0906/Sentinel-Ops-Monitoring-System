@@ -33,6 +33,15 @@ jobs:
           docker pull public.ecr.aws/docker/library/node:22-alpine3.22
           docker pull public.ecr.aws/docker/library/nginx:1.29-alpine
 
+      - name: Resolve Trivy image source
+        run: |
+          if docker pull public.ecr.aws/aquasecurity/trivy:0.57.1; then
+            echo "TRIVY_IMAGE=public.ecr.aws/aquasecurity/trivy:0.57.1" >> "$GITHUB_ENV"
+          else
+            docker pull aquasec/trivy:0.57.1
+            echo "TRIVY_IMAGE=aquasec/trivy:0.57.1" >> "$GITHUB_ENV"
+          fi
+
       - name: Build backend and frontend images
         run: |
           n=0
@@ -52,7 +61,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $HOME/.cache/trivy:/root/.cache \
             -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
-            public.ecr.aws/aquasecurity/trivy:0.57.1 image \
+            "$TRIVY_IMAGE" image \
             --severity CRITICAL \
             --ignore-unfixed \
             --exit-code 1 \
@@ -64,7 +73,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $HOME/.cache/trivy:/root/.cache \
             -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
-            public.ecr.aws/aquasecurity/trivy:0.57.1 image \
+            "$TRIVY_IMAGE" image \
             --severity CRITICAL \
             --ignore-unfixed \
             --exit-code 1 \
@@ -72,6 +81,7 @@ jobs:
 
       - name: Generate high/medium scan reports (non-blocking)
         if: ${{ always() }}
+        continue-on-error: true
         run: |
           mkdir -p security-reports
 
@@ -80,26 +90,26 @@ jobs:
             -v $HOME/.cache/trivy:/root/.cache \
             -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
             -v $PWD/security-reports:/reports \
-            public.ecr.aws/aquasecurity/trivy:0.57.1 image \
+            "$TRIVY_IMAGE" image \
             --severity HIGH,MEDIUM \
             --ignore-unfixed \
             --exit-code 0 \
             --format json \
             --output /reports/backend-trivy-high-medium.json \
-            sentinelopsmonitoringsystem-backend:latest
+            sentinelopsmonitoringsystem-backend:latest || true
 
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $HOME/.cache/trivy:/root/.cache \
             -v ${{ github.workspace }}/.trivyignore:/.trivyignore \
             -v $PWD/security-reports:/reports \
-            public.ecr.aws/aquasecurity/trivy:0.57.1 image \
+            "$TRIVY_IMAGE" image \
             --severity HIGH,MEDIUM \
             --ignore-unfixed \
             --exit-code 0 \
             --format json \
             --output /reports/frontend-trivy-high-medium.json \
-            sentinelopsmonitoringsystem-frontend:latest
+            sentinelopsmonitoringsystem-frontend:latest || true
 
       - name: Upload security reports
         if: ${{ always() }}
